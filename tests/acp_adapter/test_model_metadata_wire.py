@@ -55,6 +55,19 @@ async def _exercise(peer, cwd):
     options = _selectors(created)
     session_id = created["result"]["sessionId"]
     assert created["result"]["models"]["currentModelId"] == options["model"]["currentValue"] == CHOICE_A
+    # A client renders an effort picker per model from ``ModelInfo._meta``; the session option only
+    # describes the model in force. ``agent.reasoning_effort`` is low, so each row reports low
+    # constrained to what it declares, and the empty declaration advertises no effort at all.
+    advertised = {row["modelId"]: row["_meta"]
+                  for row in created["result"]["models"]["availableModels"]}
+    assert [choice["value"] for choice in advertised[CHOICE_A]["reasoningEfforts"]] == ["low", "high"]
+    assert advertised[CHOICE_A]["reasoningEffort"] == "low"
+    assert advertised[CHOICE_A]["reasoningEfforts"][1] == {"value": "high", "label": "High"}
+    assert [choice["value"] for choice in advertised[CHOICE_B]["reasoningEfforts"]] == ["medium"]
+    assert advertised[CHOICE_B]["reasoningEffort"] == "medium"
+    assert advertised[CHOICE_OFF]["supportsReasoningEffort"] is False
+    assert "reasoningEfforts" not in advertised[CHOICE_OFF]
+    assert "reasoningEffort" not in advertised[CHOICE_OFF]
     groups = {group["name"]: group for group in options["model"]["options"]}
     assert groups["Relay one · source-a"]["options"][0]["value"] == CHOICE_A
     assert groups["Relay one · source-b"]["options"][0]["value"] == CHOICE_B

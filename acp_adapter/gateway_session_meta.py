@@ -73,20 +73,22 @@ def model_state(info: dict) -> SessionModelState | None:
     """The picker for the session's model (``session.info``), from the shared inventory; a single
     current-model row when nothing is listable, as main's ``_build_model_state``. Blocking."""
     from acp_adapter.auth import detect_provider
+    from acp_adapter.config_options import advertise_reasoning
     from acp_adapter.model_catalog import build_model_state, encode_model_choice
     model = str(info.get("model") or "").strip()
     provider = info.get("provider") or detect_provider() or "openrouter"
     try:
         picker = build_model_state(model, provider, "")
         if picker is not None:
-            return picker
+            return advertise_reasoning(picker, info)
     except Exception:
         # Boundary: a broken inventory must not fail session/new; the current model still shows.
         logger.debug("Could not build ACP model state", exc_info=True)
     if not model:
         return None
     choice = encode_model_choice(provider, model)
-    return SessionModelState(available_models=[ModelInfo(model_id=choice, name=model)], current_model_id=choice)
+    return advertise_reasoning(
+        SessionModelState(available_models=[ModelInfo(model_id=choice, name=model)], current_model_id=choice), info)
 
 
 def provenance_meta(db_path: Path, acp_session_id: str, session_id: str) -> dict | None:

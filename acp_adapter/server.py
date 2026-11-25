@@ -27,7 +27,9 @@ from acp.schema import (
 from acp_adapter.auth import TERMINAL_SETUP_AUTH_METHOD_ID, build_auth_methods, detect_provider
 from acp_adapter.commands import SlashCommandsMixin, _estimate_tokens
 from acp_adapter.content import PromptBlock, _content_blocks_to_openai_user_content, _extract_text
-from acp_adapter.config_options import REASONING_CONFIG_ID, config_options, reasoning_choices, reasoning_effort
+from acp_adapter.config_options import (
+    REASONING_CONFIG_ID, advertise_reasoning, config_options, reasoning_choices, reasoning_effort,
+)
 from acp_adapter.events import (
     AssistantMessageIdAllocator, _build_plan_update_from_todo_result, _send_update, flush_open_tool_calls,
     make_message_cb, make_step_cb, make_thinking_cb, make_tool_progress_cb,
@@ -314,17 +316,19 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
         as ``hermes model``/TUI/dashboard) so the selector isn't just the current curated list."""
         model = str(state.model or getattr(state.agent, "model", "") or "").strip()
         provider = session_provider(state) or detect_provider() or "openrouter"
+        info = {"reasoning_effort": reasoning_effort(getattr(state.agent, "reasoning_config", None))}
         try:
             picker = build_model_state(model, provider, str(getattr(state.agent, "base_url", "") or ""))
             if picker is not None:
-                return picker
+                return advertise_reasoning(picker, info)
         except Exception:
             logger.debug("Could not build ACP model state", exc_info=True)
 
         if not model:
             return None
         choice = encode_model_choice(provider, model)
-        return SessionModelState(available_models=[ModelInfo(model_id=choice, name=model)], current_model_id=choice)
+        return advertise_reasoning(
+            SessionModelState(available_models=[ModelInfo(model_id=choice, name=model)], current_model_id=choice), info)
 
     def _switch_model(
         self, state: SessionState, raw_model: str, *, keep_endpoint: bool = False
